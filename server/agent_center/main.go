@@ -2,15 +2,16 @@ package main
 
 import (
 	"fmt"
+	"net/http"
+	_ "net/http/pprof"
+	"os/signal"
+	"syscall"
+
 	"github.com/bytedance/Elkeid/server/agent_center/common"
 	"github.com/bytedance/Elkeid/server/agent_center/common/ylog"
 	"github.com/bytedance/Elkeid/server/agent_center/grpctrans"
 	"github.com/bytedance/Elkeid/server/agent_center/httptrans"
 	"github.com/bytedance/Elkeid/server/agent_center/svr_registry"
-	"net/http"
-	_ "net/http/pprof"
-	"os/signal"
-	"syscall"
 )
 
 func init() {
@@ -21,7 +22,11 @@ func main() {
 	ylog.Infof("[MAIN]", "START_SERVER")
 
 	//start http server and grpc server
+
+	// API service
 	go httptrans.Run()
+
+	// rpc service
 	go grpctrans.Run()
 
 	//start pprof for debug

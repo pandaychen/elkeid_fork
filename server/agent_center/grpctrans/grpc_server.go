@@ -4,15 +4,16 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"io/ioutil"
+	"net"
+	"os"
+	"time"
+
 	"github.com/bytedance/Elkeid/server/agent_center/common"
 	"github.com/bytedance/Elkeid/server/agent_center/common/ylog"
 	"github.com/bytedance/Elkeid/server/agent_center/grpctrans/grpc_handler"
 	pb "github.com/bytedance/Elkeid/server/agent_center/grpctrans/proto"
 	"google.golang.org/grpc"
-	"io/ioutil"
-	"net"
-	"os"
-	"time"
 
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/keepalive"
@@ -42,6 +43,7 @@ const (
 )
 
 func Run() {
+	// 初始化全局grpc server变量
 	grpc_handler.InitGlobalGRPCPool()
 	runServer(true, common.GRPCPort, common.SSLCertFile, common.SSLKeyFile, common.SSLCaFile)
 }
@@ -73,7 +75,7 @@ func credential(crtFile, keyFile, caFile string) credentials.TransportCredential
 	})
 }
 
-//start grpc server
+// start grpc server
 // - enableCA: Whether to enable ssl
 func runServer(enableCA bool, port int, crtFile, keyFile, caFile string) {
 	// Handling client timeout
@@ -106,6 +108,8 @@ func runServer(enableCA bool, port int, crtFile, keyFile, caFile string) {
 	}
 
 	server := grpc.NewServer(opts...)
+
+	// 注册TransferHandler && FileExtHandler
 	pb.RegisterTransferServer(server, &grpc_handler.TransferHandler{})
 	fileHandler := &grpc_handler.FileExtHandler{FileBaseDir: common.FileDir}
 	fileHandler.Init()

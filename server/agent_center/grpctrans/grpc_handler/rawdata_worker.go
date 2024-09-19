@@ -3,6 +3,11 @@ package grpc_handler
 import (
 	"encoding/json"
 	"fmt"
+	"math"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/bytedance/Elkeid/server/agent_center/common"
 	"github.com/bytedance/Elkeid/server/agent_center/common/kafka"
 	"github.com/bytedance/Elkeid/server/agent_center/common/ylog"
@@ -10,10 +15,6 @@ import (
 	pb "github.com/bytedance/Elkeid/server/agent_center/grpctrans/proto"
 	"github.com/gogo/protobuf/proto"
 	"github.com/prometheus/client_golang/prometheus"
-	"math"
-	"strconv"
-	"strings"
-	"time"
 )
 
 func handleRawData(req *pb.RawData, conn *pool.Connection) (agentID string) {

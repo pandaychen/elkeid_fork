@@ -3,13 +3,22 @@ package grpc_handler
 import (
 	"context"
 	"errors"
+	"time"
+
 	"github.com/bytedance/Elkeid/server/agent_center/common"
 	"github.com/bytedance/Elkeid/server/agent_center/common/ylog"
 	"github.com/bytedance/Elkeid/server/agent_center/grpctrans/pool"
 	pb "github.com/bytedance/Elkeid/server/agent_center/grpctrans/proto"
 	"google.golang.org/grpc/peer"
-	"time"
 )
+
+// 指令 && 数据的 grpc stream实现
+
+/*
+service Transfer {
+  rpc Transfer (stream RawData) returns (stream Command){}
+}
+*/
 
 type TransferHandler struct{}
 
@@ -24,8 +33,11 @@ func InitGlobalGRPCPool() {
 	GlobalGRPCPool = pool.NewGRPCPool(option)
 }
 
+// rpc method（长连接）
 func (h *TransferHandler) Transfer(stream pb.Transfer_TransferServer) error {
 	//Maximum number of concurrent connections
+
+	// 并发控制
 	if !GlobalGRPCPool.LoadToken() {
 		err := errors.New("out of max connection limit")
 		ylog.Errorf("Transfer", err.Error())
@@ -36,6 +48,8 @@ func (h *TransferHandler) Transfer(stream pb.Transfer_TransferServer) error {
 	}()
 
 	//Receive the first packet and get the AgentID
+
+	// 从stream获取agent发送的第一个报文
 	data, err := stream.Recv()
 	if err != nil {
 		ylog.Errorf("Transfer", "Transfer error %s", err.Error())
@@ -64,6 +78,8 @@ func (h *TransferHandler) Transfer(stream pb.Transfer_TransferServer) error {
 		CancelFuc:   cancelButton,
 	}
 	ylog.Infof("Transfer", ">>>>now set %s %v", agentID, connection)
+
+	// 向GlobalGRPCPool（在线连接池）保存此agent的连接信息
 	err = GlobalGRPCPool.Add(agentID, &connection)
 	if err != nil {
 		ylog.Errorf("Transfer", "Transfer error %s", err.Error())
@@ -78,11 +94,12 @@ func (h *TransferHandler) Transfer(stream pb.Transfer_TransferServer) error {
 	//Process the first of data
 	handleRawData(data, &connection)
 
-	//Receive data from agent
+	//Receive data from agent（接收agent的数据stream.Recv()）
 	go recvData(stream, &connection)
-	//Send command to agent
+	//Send command to agent（向agent发送数据 stream.Send()）
 	go sendData(stream, &connection)
 
+	// stream是一个长连接，这里等待上层主动结束
 	//stop here
 	<-connection.Ctx.Done()
 	return nil
@@ -116,7 +133,7 @@ func sendData(stream pb.Transfer_TransferServer, conn *pool.Connection) {
 		case <-conn.Ctx.Done():
 			ylog.Infof("sendData", "the recv direction of the tcp is closed, now close the send direction, %s ", conn.AgentID)
 			return
-		case cmd := <-conn.CommandChan:
+		case cmd := <-conn.CommandChan: //SEND是被动触发的，由API主动写入指令到conn.CommandChan中
 			//if cmd is nil, close the connection
 			if cmd == nil {
 				ylog.Infof("sendData", "get the close signal , now close the send direction of the tcp, %s ", conn.AgentID)
